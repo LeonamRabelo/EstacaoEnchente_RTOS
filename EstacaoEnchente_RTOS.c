@@ -28,10 +28,15 @@ ssd1306_t ssd;
 #define I2C_SDA 14      //Pino SDA - Dados
 #define I2C_SCL 15      //Pino SCL - Clock
 #define IS_RGBW false   //Maquina PIO para RGBW
+#define BOTAO_A 5
 
 //Função para modularizar a inicialização do hardware
 void inicializar_componentes(){
     stdio_init_all();
+    //Inicializa o botão
+    gpio_init(BOTAO_A);
+    gpio_set_dir(BOTAO_A, GPIO_IN);
+    gpio_pull_up(BOTAO_A);
     // Inicializa LED Vermelho
     gpio_init(LED_RED);
     gpio_set_dir(LED_RED, GPIO_OUT);
@@ -131,37 +136,100 @@ void vTaskProcessamento(void *param){
 //Task para exibicao dos dados lidos
 void vTaskDisplay(void *param){
     while(true){
-        printf("Nivel Agua: %d%% | Chuva: %d%% | Status: %s\n",
-               em_alerta ? 70 : 30,
-               em_alerta ? 90 : 20,
-               em_alerta ? "ALERTA" : "Normal");
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        LeituraSensor leitura;
+        if (xQueuePeek(filaSensores, &leitura, 0)) {
+            ssd1306_fill(&ssd, false);
+            ssd1306_draw_string(&ssd, em_alerta ? "!! ALERTA !!" : "Monitoramento", 10, 0);
+            char buffer[32];
+            sprintf(buffer, "Agua: %d%%", leitura.nivel_agua);
+            ssd1306_draw_string(&ssd, buffer, 10, 20);
+            sprintf(buffer, "Chuva: %d%%", leitura.volume_chuva);
+            ssd1306_draw_string(&ssd, buffer, 10, 40);
+            ssd1306_send_data(&ssd);
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+void atualizar_rgb(uint8_t nivel){
+    if(nivel >= 70){
+        gpio_put(LED_RED, 1);
+        gpio_put(LED_GREEN, 0);
+    }else if (nivel >= 60){
+        gpio_put(LED_RED, 1);
+        gpio_put(LED_GREEN, 1);
+    }else{
+        gpio_put(LED_RED, 0);
+        gpio_put(LED_GREEN, 1);
     }
 }
 
 //Task para visualizacao dos leds
-void vTaskVisual(void *param){
-    while(true){
-        gpio_put(LED_RED, em_alerta);
-        gpio_put(LED_GREEN, !em_alerta);
-        gpio_put(LED_BLUE, 0);
-        vTaskDelay(pdMS_TO_TICKS(200));
-    }
+void vTaskLedRGB(void *param){
+    atualizar_rgb(0);
 }
 
 //Task para tocar o buzzer
 void vTaskBuzzer(void *param){
     while(true){
         if(em_alerta){
-        pwm_set_enabled(buzzer_slice, true);
-        sleep_ms(200);
-        pwm_set_enabled(buzzer_slice, false);
-        sleep_ms(800);
-        }else{
-            vTaskDelay(pdMS_TO_TICKS(300));
+            for(int i = 0; i < 3; i++){
+                pwm_set_enabled(buzzer_slice, true);
+                vTaskDelay(pdMS_TO_TICKS(150));
+                pwm_set_enabled(buzzer_slice, false);
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));  // pausa entre ciclos
+        } else {
+            pwm_set_enabled(buzzer_slice, true);
+            vTaskDelay(pdMS_TO_TICKS(400));
+            pwm_set_enabled(buzzer_slice, false);
+            vTaskDelay(pdMS_TO_TICKS(600));
         }
     }
 }
+
+// Converte a porcentagem de nível de água em um índice de exibição
+int calcular_nivel_visual(uint8_t nivel){
+    if (nivel <= 20) return 1;
+    else if (nivel <= 40) return 2;
+    else if (nivel <= 60) return 3;
+    else if (nivel <= 80) return 4;
+    else return 5;
+}
+
+void vTaskMatrizLeds(void *param){
+    LeituraSensor leitura;
+
+    while(true){
+        if (xQueuePeek(filaSensores, &leitura, 0)){
+            if(em_alerta){
+                set_one_led(255, 255, 0, 0);  // Exclamação
+            }else{
+                int nivel = calcular_nivel_visual(leitura.nivel_agua);
+                set_one_led(0, 0, 255, nivel);  // Azul para níveis
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));  // Atualiza a cada meio segundo
+    }
+}
+
+void vTaskBotao(void *param){
+    static bool ultimo_estado = true; // estado anterior do botão
+    while(true){
+        bool estado_atual = gpio_get(BOTAO_A);
+        
+        if (!estado_atual && ultimo_estado) { // botão pressionado (falling edge)
+            em_alerta = !em_alerta; // alterna manualmente o modo de alerta
+            printf(">>> Modo alerta %s manualmente!\n", em_alerta ? "ATIVADO" : "DESATIVADO");
+            vTaskDelay(pdMS_TO_TICKS(300)); // debounce + evitar múltiplas detecções
+        }
+
+        ultimo_estado = estado_atual;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
 
 int main(){
     stdio_init_all();
@@ -174,8 +242,10 @@ int main(){
     xTaskCreate(vTaskLeituraJoystick, "Leitura", 1024, NULL, 1, NULL);
     xTaskCreate(vTaskProcessamento, "Processa", 1024, NULL, 1, NULL);
     xTaskCreate(vTaskDisplay, "Display", 1024, NULL, 1, NULL);
-    xTaskCreate(vTaskVisual, "Visual", 1024, NULL, 1, NULL);
+    xTaskCreate(vTaskLedRGB, "LedRGB", 1024, NULL, 1, NULL);
     xTaskCreate(vTaskBuzzer, "Buzzer", 1024, NULL, 1, NULL);
+    xTaskCreate(vTaskMatrizLeds, "MatrizLEDs", 1024, NULL, 1, NULL);
+    xTaskCreate(vTaskBotao, "BotaoA", 1024, NULL, 1, NULL);
 
     vTaskStartScheduler();
 }
