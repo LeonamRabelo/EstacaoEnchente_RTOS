@@ -59,6 +59,7 @@ target_link_libraries(EstacaoEnchente_RTOS
         hardware_gpio
         hardware_i2c
         hardware_pwm
+        hardware_adc
         hardware_pio
         FreeRTOS-Kernel         # Kernel do FreeRTOS
         FreeRTOS-Kernel-Heap4   # Gerenciador de memoria

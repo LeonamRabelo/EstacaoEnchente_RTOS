@@ -23,35 +23,35 @@ bool alertas[6][NUM_PIXELS] = {
 },
 //0-20% Primeiro nivel
 {
+    1, 1, 1, 1, 1,
     0, 0, 0, 0, 0,      
     0, 0, 0, 0, 0,  
     0, 0, 0, 0, 0,   
-    0, 0, 0, 0, 0,  
-    1, 1, 1, 1, 1
+    0, 0, 0, 0, 0
 },
 //21-40% Segundo nivel
 {
+    1, 1, 1, 1, 1,  
+    1, 1, 1, 1, 1,
     0, 0, 0, 0, 0,      
     0, 0, 0, 0, 0,  
-    0, 0, 0, 0, 0,   
-    1, 1, 1, 1, 1,  
-    1, 1, 1, 1, 1
+    0, 0, 0, 0, 0
 },
 //41-60% Terceiro nivel
 {
-    0, 0, 0, 0, 0,      
-    0, 0, 0, 0, 0,  
     1, 1, 1, 1, 1,   
     1, 1, 1, 1, 1,  
-    1, 1, 1, 1, 1
+    1, 1, 1, 1, 1,
+    0, 0, 0, 0, 0,      
+    0, 0, 0, 0, 0
 },
 //61-80% Quarto nivel
-{
-    0, 0, 0, 0, 0,      
+{    
     1, 1, 1, 1, 1,  
     1, 1, 1, 1, 1,   
     1, 1, 1, 1, 1,  
-    1, 1, 1, 1, 1
+    1, 1, 1, 1, 1,
+    0, 0, 0, 0, 0
 },
 //81-100% Quinto e ultimo nivel
 {
@@ -64,7 +64,7 @@ bool alertas[6][NUM_PIXELS] = {
 };
 
 //Função para envio dos dados para a matriz de leds
-static inline void set_one_led(uint8_t r, uint8_t g, uint8_t b, int numero){
+void set_one_led(uint8_t r, uint8_t g, uint8_t b, int numero){
     uint32_t color = urgb_u32(r, g, b);
     for(int i = 0; i < NUM_PIXELS; i++){
         if(alertas[numero][i]){
