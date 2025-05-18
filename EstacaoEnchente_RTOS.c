@@ -18,18 +18,18 @@
 //Estrutura do display
 ssd1306_t ssd;
 
-// --- DEFINICOES ---
+//Pinagens de hardware
 #define ADC_AGUA 27   // ADC1 - Nivel de Agua
 #define ADC_CHUVA 26  // ADC0 - Volume de Chuva
-#define LED_RED 13
-#define LED_GREEN 11
-#define LED_BLUE 12
-#define BUZZER_PIN 21
+#define LED_RED 13      //LED Vermelho
+#define LED_GREEN 11    //LED Verde
+#define LED_BLUE 12     //LED Azul
+#define BUZZER_PIN 21   //Pino do Buzzer
 #define WS2812_PIN 7    //Pino do WS2812
 #define I2C_SDA 14      //Pino SDA - Dados
 #define I2C_SCL 15      //Pino SCL - Clock
 #define IS_RGBW false   //Maquina PIO para RGBW
-#define BOTAO_A 5
+#define BOTAO_A 5       //Botão A
 
 //Estrutura para armazenar leitura dos sensores (nivel da agua e volume da chuva)
 typedef struct{
@@ -37,11 +37,12 @@ typedef struct{
     uint8_t volume_chuva;
 }LeituraSensor;
 
-//Variaveis globais
+//Fila para armazenar leitura dos sensores
 QueueHandle_t xFilaDisplay;
 QueueHandle_t xFilaMatrizLeds;
 QueueHandle_t xFilaLedRGB;
 
+//Variaveis globais
 bool em_alerta = false;
 uint buzzer_slice;
 bool alerta_manual = false;
@@ -58,13 +59,13 @@ void vTaskLeituraJoystick(void *param){
     adc_gpio_init(ADC_AGUA);
 
     while(true){
-        // Leitura dos ADCs
+        //Leitura dos ADCs
         adc_select_input(1);
         uint16_t adc_agua = adc_read();
         adc_select_input(0);
         uint16_t adc_chuva = adc_read();
 
-        // Conversão para porcentagem
+        //Conversão para porcentagem
         uint8_t nivel_agua = map_adc(adc_agua);
         uint8_t volume_chuva = map_adc(adc_chuva);
 
@@ -77,6 +78,7 @@ void vTaskLeituraJoystick(void *param){
             .nivel_agua = nivel_agua,
             .volume_chuva = volume_chuva
         };
+        //Envia para as filas de leitura
         xQueueSend(xFilaDisplay, &leitura, 0);
         xQueueSend(xFilaMatrizLeds, &leitura, 0);
         xQueueSend(xFilaLedRGB, &leitura, 0);
@@ -102,10 +104,11 @@ void vTaskDisplay(void *param){
     ssd1306_send_data(&ssd);
 
     while(true){
-        LeituraSensor leitura;
-        if(xQueueReceive(xFilaDisplay, &leitura, 0)){
-            ssd1306_fill(&ssd, false);
-            ssd1306_draw_string(&ssd, em_alerta ? "!! ALERTA !!" : "Monitoramento", 10, 0);
+        LeituraSensor leitura;  //Leitura da fila
+        if(xQueueReceive(xFilaDisplay, &leitura, 0)){   //Chama a leitura da fila
+            ssd1306_fill(&ssd, false);                  //Limpa o display
+            ssd1306_draw_string(&ssd, em_alerta ? "!! ALERTA !!" : "Monitoramento", 10, 0); //Exibe o texto no display de acordo com o alerta
+            //Exibe os dados no display de acordo com os dados lidos
             char buffer[32];
             sprintf(buffer, "Agua: %d%%", leitura.nivel_agua);
             ssd1306_draw_string(&ssd, buffer, 10, 20);
@@ -179,7 +182,7 @@ void vTaskBuzzer(void *param){
 
 // Converte a porcentagem de nível de água em um índice de exibição
 int calcular_nivel_visual(uint8_t nivel){
-    if (nivel <= 20) return 1;
+    if(nivel <= 20) return 1;
     else if (nivel <= 40) return 2;
     else if (nivel <= 60) return 3;
     else if (nivel <= 80) return 4;
@@ -197,13 +200,13 @@ void vTaskMatrizLeds(void *param){
     while(true){
         if(xQueueReceive(xFilaMatrizLeds, &leitura, 0)){
             if(em_alerta){
-                set_one_led(255, 0, 0, 0);  //Exclamação vermelha
+                set_one_led(100, 0, 0, 0);  //Exclamação vermelha
             }else{
                 int nivel = calcular_nivel_visual(leitura.nivel_agua);
-                set_one_led(0, 0, 255, nivel);  // Azul para níveis normais, representando o nível de agua
+                set_one_led(0, 0, 100, nivel);  //Azul para níveis normais, representando o nível de agua
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(500));  // Atualiza a cada meio segundo
+        vTaskDelay(pdMS_TO_TICKS(500));  //Atualiza a cada meio segundo
     }
 }
 
@@ -220,7 +223,7 @@ void vTaskBotao(void *param){
             alerta_manual = !alerta_manual;
             em_alerta = alerta_manual ? true : false;
             printf(">>> Modo alerta %s manualmente!\n", em_alerta ? "ATIVADO" : "DESATIVADO");
-            vTaskDelay(pdMS_TO_TICKS(300)); // debounce + evitar múltiplas detecções
+            vTaskDelay(pdMS_TO_TICKS(300)); //debounce + evitar múltiplas detecções
         }
 
         ultimo_estado = estado_atual;
@@ -228,35 +231,21 @@ void vTaskBotao(void *param){
     }
 }
 
-// Modo BOOTSEL com botão B
-#include "pico/bootrom.h"
-#define botaoB 6
-void gpio_irq_handler(uint gpio, uint32_t events)
-{
-    reset_usb_boot(0, 0);
-}
-
 int main(){
     stdio_init_all();
-    
-    // Ativa BOOTSEL via botão
-    gpio_init(botaoB);
-    gpio_set_dir(botaoB, GPIO_IN);
-    gpio_pull_up(botaoB);
-    gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
     // Fila
     xFilaDisplay = xQueueCreate(7, sizeof(LeituraSensor));
     xFilaMatrizLeds = xQueueCreate(7, sizeof(LeituraSensor));
     xFilaLedRGB = xQueueCreate(7, sizeof(LeituraSensor));
 
-    // Tarefas
+    //Tarefas
     xTaskCreate(vTaskLeituraJoystick, "Leitura", 256, NULL, 1, NULL);
     xTaskCreate(vTaskDisplay, "Display", 512, NULL, 1, NULL);
     xTaskCreate(vTaskLedRGB, "LedRGB", 256, NULL, 1, NULL);
     xTaskCreate(vTaskBuzzer, "Buzzer", 256, NULL, 1, NULL);
     xTaskCreate(vTaskMatrizLeds, "MatrizLEDs", 512, NULL, 1, NULL);
-    xTaskCreate(vTaskBotao, "BotaoA", 256, NULL, 1, NULL);    //Verificar
+    xTaskCreate(vTaskBotao, "BotaoA", 256, NULL, 1, NULL);
 
     vTaskStartScheduler();
     panic_unsupported();
