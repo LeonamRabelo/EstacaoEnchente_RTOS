@@ -107,11 +107,16 @@ void vTaskDisplay(void *param){
         LeituraSensor leitura;  //Leitura da fila
         if(xQueueReceive(xFilaDisplay, &leitura, 0)){   //Chama a leitura da fila
             ssd1306_fill(&ssd, false);                  //Limpa o display
-            ssd1306_draw_string(&ssd, em_alerta ? "!! ALERTA !!" : "Monitoramento", 10, 0); //Exibe o texto no display de acordo com o alerta
+            //Borda
+            ssd1306_rect(&ssd, 0, 0, 128, 64, true, false);
+            ssd1306_rect(&ssd, 1, 1, 128 - 2, 64 - 2, true, false);
+            ssd1306_rect(&ssd, 2, 2, 128 - 4, 64 - 4, true, false);
+            ssd1306_rect(&ssd, 3, 3, 128 - 6, 64 - 6, true, false);
+            ssd1306_draw_string(&ssd, em_alerta ? "!! ALERTA !!" : "Monitoramento", 10, 10); //Exibe o texto no display de acordo com o alerta
             //Exibe os dados no display de acordo com os dados lidos
             char buffer[32];
             sprintf(buffer, "Agua: %d%%", leitura.nivel_agua);
-            ssd1306_draw_string(&ssd, buffer, 10, 20);
+            ssd1306_draw_string(&ssd, buffer, 10, 25);
             sprintf(buffer, "Chuva: %d%%", leitura.volume_chuva);
             ssd1306_draw_string(&ssd, buffer, 10, 40);
             ssd1306_send_data(&ssd);
@@ -200,7 +205,7 @@ void vTaskMatrizLeds(void *param){
     while(true){
         if(xQueueReceive(xFilaMatrizLeds, &leitura, 0)){
             if(em_alerta){
-                set_one_led(100, 0, 0, 0);  //Exclamação vermelha
+                set_one_led(10, 0, 0, 0);  //Exclamação vermelha
             }else{
                 int nivel = calcular_nivel_visual(leitura.nivel_agua);
                 set_one_led(0, 0, 100, nivel);  //Azul para níveis normais, representando o nível de agua
@@ -219,7 +224,7 @@ void vTaskBotao(void *param){
     while(true){
         bool estado_atual = gpio_get(BOTAO_A);
         
-        if (!estado_atual && ultimo_estado) { // botão pressionado (falling edge)
+        if (!estado_atual && ultimo_estado) { //botão pressionado (falling edge)
             alerta_manual = !alerta_manual;
             em_alerta = alerta_manual ? true : false;
             printf(">>> Modo alerta %s manualmente!\n", em_alerta ? "ATIVADO" : "DESATIVADO");
