@@ -170,8 +170,8 @@ void vTaskBuzzer(void *param){
     pwm_set_gpio_level(BUZZER_PIN, wrap * 0.3f); //Define duty
     pwm_set_enabled(buzzer_slice, false); //Começa desligado
     while(true){
-        if(em_alerta){
-            for(int i = 0; i < 3; i++){
+        if(em_alerta){  //Verifica se está em alerta
+            for(int i = 0; i < 3; i++){ //Toca o buzzer 3 vezes rapidamente
                 pwm_set_enabled(buzzer_slice, true);
                 vTaskDelay(pdMS_TO_TICKS(150));
                 pwm_set_enabled(buzzer_slice, false);
@@ -187,11 +187,11 @@ void vTaskBuzzer(void *param){
 
 // Converte a porcentagem de nível de água em um índice de exibição
 int calcular_nivel_visual(uint8_t nivel){
-    if(nivel <= 20) return 1;
-    else if (nivel <= 40) return 2;
-    else if (nivel <= 60) return 3;
-    else if (nivel <= 80) return 4;
-    else return 5;
+    if(nivel <= 20) return 1;           //Se o nível for menor ou igual a 20%, retorna 1
+    else if (nivel <= 40) return 2;     //Se o nível for menor ou igual a 40%, retorna 2
+    else if (nivel <= 60) return 3;     //Se o nível for menor ou igual a 60%, retorna 3
+    else if (nivel <= 80) return 4;     //Se o nível for menor ou igual a 80%, retorna 4
+    else return 5;                      //Se o nível for maior que 80%, retorna 5
 }
 
 void vTaskMatrizLeds(void *param){
@@ -220,13 +220,13 @@ void vTaskBotao(void *param){
     gpio_init(BOTAO_A);
     gpio_set_dir(BOTAO_A, GPIO_IN);
     gpio_pull_up(BOTAO_A);
-    static bool ultimo_estado = true; // estado anterior do botão
+    static bool ultimo_estado = true; //estado anterior do botão
     while(true){
         bool estado_atual = gpio_get(BOTAO_A);
         
         if (!estado_atual && ultimo_estado) { //botão pressionado (falling edge)
-            alerta_manual = !alerta_manual;
-            em_alerta = alerta_manual ? true : false;
+            alerta_manual = !alerta_manual;     //alterna o estado
+            em_alerta = alerta_manual ? true : false;   //alterna o estado de alerta do sistema
             printf(">>> Modo alerta %s manualmente!\n", em_alerta ? "ATIVADO" : "DESATIVADO");
             vTaskDelay(pdMS_TO_TICKS(300)); //debounce + evitar múltiplas detecções
         }
@@ -239,12 +239,12 @@ void vTaskBotao(void *param){
 int main(){
     stdio_init_all();
 
-    // Fila
+    //Filas de tarefas
     xFilaDisplay = xQueueCreate(7, sizeof(LeituraSensor));
     xFilaMatrizLeds = xQueueCreate(7, sizeof(LeituraSensor));
     xFilaLedRGB = xQueueCreate(7, sizeof(LeituraSensor));
 
-    //Tarefas
+    //Tarefas a serem executadas
     xTaskCreate(vTaskLeituraJoystick, "Leitura", 256, NULL, 1, NULL);
     xTaskCreate(vTaskDisplay, "Display", 512, NULL, 1, NULL);
     xTaskCreate(vTaskLedRGB, "LedRGB", 256, NULL, 1, NULL);
@@ -252,6 +252,6 @@ int main(){
     xTaskCreate(vTaskMatrizLeds, "MatrizLEDs", 512, NULL, 1, NULL);
     xTaskCreate(vTaskBotao, "BotaoA", 256, NULL, 1, NULL);
 
-    vTaskStartScheduler();
-    panic_unsupported();
+    vTaskStartScheduler();  //Inicia o scheduler de tarefas
+    panic_unsupported();    
 }
