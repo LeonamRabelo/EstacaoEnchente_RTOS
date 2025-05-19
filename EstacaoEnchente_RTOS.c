@@ -177,15 +177,15 @@ void vTaskBuzzer(void *param){
                 pwm_set_enabled(buzzer_slice, false);
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
-            vTaskDelay(pdMS_TO_TICKS(500));  // pausa entre ciclos
+            vTaskDelay(pdMS_TO_TICKS(500));  //pausa entre ciclos
         }else{
             pwm_set_enabled(buzzer_slice, false);
-            vTaskDelay(pdMS_TO_TICKS(500));  // pausa entre ciclos
+            vTaskDelay(pdMS_TO_TICKS(500));  //pausa entre ciclos
         }
     }
 }
 
-// Converte a porcentagem de nível de água em um índice de exibição
+//Converte a porcentagem de nível de água em um índice de exibição
 int calcular_nivel_visual(uint8_t nivel){
     if(nivel <= 20) return 1;           //Se o nível for menor ou igual a 20%, retorna 1
     else if (nivel <= 40) return 2;     //Se o nível for menor ou igual a 40%, retorna 2
@@ -194,6 +194,7 @@ int calcular_nivel_visual(uint8_t nivel){
     else return 5;                      //Se o nível for maior que 80%, retorna 5
 }
 
+//Task para exibir a matriz de leds
 void vTaskMatrizLeds(void *param){
     //Inicializa o pio
     PIO pio = pio0;
@@ -215,6 +216,7 @@ void vTaskMatrizLeds(void *param){
     }
 }
 
+//Task para leitura do botão
 void vTaskBotao(void *param){
     //Inicializa o botão
     gpio_init(BOTAO_A);
@@ -231,7 +233,7 @@ void vTaskBotao(void *param){
             vTaskDelay(pdMS_TO_TICKS(300)); //debounce + evitar múltiplas detecções
         }
 
-        ultimo_estado = estado_atual;
+        ultimo_estado = estado_atual;   //atualiza o estado
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
